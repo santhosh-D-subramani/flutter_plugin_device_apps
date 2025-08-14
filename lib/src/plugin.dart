@@ -176,7 +176,7 @@ class _BaseApplication {
   /// Name of the package
   final String packageName;
 
-  _BaseApplication._fromMap(Map<dynamic, dynamic> map)
+  _BaseApplication.fromMap(Map<dynamic, dynamic> map)
       : packageName = map['package_name'] as String;
 }
 
@@ -226,11 +226,11 @@ class Application extends _BaseApplication {
     if (map.containsKey('app_icon')) {
       return ApplicationWithIcon._fromMap(map);
     } else {
-      return Application._fromMap(map);
+      return Application.fromMap(map);
     }
   }
 
-  Application._fromMap(Map<dynamic, dynamic> map)
+  Application.fromMap(Map<dynamic, dynamic> map)
       : appName = map['app_name'] as String,
         apkFilePath = map['apk_file_path'] as String,
         versionName = map['version_name'] as String?,
@@ -241,7 +241,7 @@ class Application extends _BaseApplication {
         updateTimeMillis = map['update_time'] as int,
         enabled = map['is_enabled'] as bool,
         category = _parseCategory(map['category']),
-        super._fromMap(map);
+        super.fromMap(map);
 
   /// Mapping of Android categories
   /// [https://developer.android.com/reference/kotlin/android/content/pm/ApplicationInfo]
@@ -352,7 +352,7 @@ class ApplicationWithIcon extends Application {
 
   ApplicationWithIcon._fromMap(Map<dynamic, dynamic> map)
       : _icon = map['app_icon'] as String,
-        super._fromMap(map);
+        super.fromMap(map);
 
   /// Icon of the application to use in conjunction with [Image.memory]
   Uint8List get icon => base64.decode(_icon);
@@ -493,7 +493,7 @@ class ApplicationEventUninstalled extends ApplicationEvent {
   final _BaseApplication _application;
 
   ApplicationEventUninstalled._fromMap(Map<dynamic, dynamic> map)
-      : _application = _BaseApplication._fromMap(map),
+      : _application = _BaseApplication.fromMap(map),
         super._fromMap(map);
 
   @override
