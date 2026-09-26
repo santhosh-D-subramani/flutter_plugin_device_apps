@@ -3,6 +3,9 @@ analyzer:
     - "lib/**/translations.dart"
     - "**/*.g.dart"
     - "**/*.freezed.dart"
+    - build/**
+    - android/**
+    - ios/**
   errors:
     always_specify_types: error
     always_declare_return_types: error
@@ -22,7 +25,7 @@ analyzer:
     directives_ordering: error
     empty_constructor_bodies: error
     empty_statements: error
-    iterable_contains_unrelated_type: error
+    collection_methods_unrelated_type: error
     file_names: error
     hash_and_equals: error
     no_adjacent_strings_in_list: error
@@ -66,7 +69,7 @@ linter:
     - directives_ordering
     - empty_constructor_bodies
     - empty_statements
-    - iterable_contains_unrelated_type
+    - collection_methods_unrelated_type
     - file_names
     - hash_and_equals
     - no_adjacent_strings_in_list

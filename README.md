@@ -25,7 +25,11 @@ Starting with Android 11, Android applications targeting API level 30, willing t
 - A normal permission doesn't require the user consent
 - Before version 2.1 of this plugin, the permission was requested automatically. This is not the case anymore
 
-If you want to use, simply add the following to your AndroidManifest.xml:
+**Since version 3.0.0, the plugin declares a `<queries>` entry for launcher activities**: every app visible in a launcher
+(= `onlyAppsWithLaunchIntent: true`) is listed without any permission. `QUERY_ALL_PACKAGES` is only needed to also see
+packages without a launcher icon (background services, most system components…).
+
+If you need it, simply add the following to your AndroidManifest.xml:
 
 ```xml
 <manifest...>
@@ -135,6 +139,66 @@ To display the image, just call:
 
 ```dart
 Image.memory(app.icon);
+```
+
+Icons are rendered at their intrinsic size by default (often 300px+). Pass the size you display them at, in pixels,
+to make the call much faster and lighter:
+
+```dart
+final int iconSize = (40 * MediaQuery.devicePixelRatioOf(context)).round();
+List<Application> apps = await DeviceApps.getInstalledApplications(includeAppIcons: true, iconSize: iconSize);
+```
+
+### Lazy icons (recommended for lists)
+
+The fastest way to display a list is to fetch it **without** icons, and to load each icon when its row is built:
+
+```dart
+List<Application> apps = await DeviceApps.getInstalledApplications();
+
+// In your list item
+FutureBuilder<Uint8List?>(
+  future: DeviceApps.getAppIcon(app.packageName, iconSize: iconSize), // or app.loadIcon()
+  builder: (context, snapshot) => snapshot.hasData ? Image.memory(snapshot.data!) : const SizedBox(),
+);
+```
+
+See `example/lib/app_icon.dart` for a version with a cache, and the "Fetch benchmark" screen of the example to compare
+the three strategies on your device.
+
+## Application attributes
+
+Besides the name, package name, version, paths and install/update times, each `Application` exposes:
+
+- `targetSdkVersion` / `minSdkVersion` (Android 24+)
+- `apkSize`: size in bytes of the base APK + split APKs
+- `launchable`: whether the app has a launcher entrypoint
+- `category` (Android 26+)
+
+## Application details
+
+`getAppDetails()` returns advanced information, fetched on demand (it is slower than a listing):
+
+```dart
+ApplicationDetails? details = await DeviceApps.getAppDetails('com.frandroid.app');
+
+details.installerPackageName;      // eg: com.android.vending
+details.installedFromPlayStore;    // true / false
+details.sideloaded;                // installed from an APK file or adb
+details.permissions;               // requested permissions, and whether they are granted
+details.signingCertificatesSha256; // AA:BB:… fingerprints, eg: to check the app is genuine
+details.splitNames;                // App Bundle split APKs
+details.activitiesCount;           // also services, receivers & providers
+details.debuggable;
+```
+
+## Open an application in the store
+
+Opens the app page in a store app (eg: Play Store), or the Play Store website otherwise. The app doesn't need to be
+installed:
+
+```dart
+DeviceApps.openAppInStore('com.frandroid.app');
 ```
 
 ## Listen to app changes

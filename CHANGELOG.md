@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.0.0] - 26th September 2026
+
+* [BREAKING CHANGE] Requires Dart 3 / Flutter 3.10+ (the previous `<3.0.0` SDK constraint no longer resolved)
+* [BREAKING CHANGE] New `ApplicationCategory.accessibility` value (Android 31+)
+* Android: no more deprecated API calls (`PackageInfoFlags`/`ResolveInfoFlags` on Android 13+, `getLongVersionCode`,
+  `InstallSourceInfo`, `SigningInfo`, receiver export flag on Android 13+), `package` attribute removed from the manifest
+* Faster `getInstalledApplications`:
+  * apps are read on several threads in parallel
+  * launchable apps are resolved with 2 queries instead of 2 queries per installed app
+  * icons are sent as raw bytes instead of Base64
+  * new `iconSize` parameter to render icons at display size
+* New `getAppIcon()` to lazily load icons, `getAppDetails()` (installer, permissions, signing certificates, splits,
+  components…) and `openAppInStore()`
+* New `Application` attributes: `targetSdkVersion`, `minSdkVersion`, `apkSize`, `launchable`, `installTime`,
+  `updateTime`
+* Launchable apps are visible on Android 11+ without the `QUERY_ALL_PACKAGES` permission (`<queries>` declared by the plugin)
+* Fix enabled/disabled events being inverted
+* Fix crashes: icons without an intrinsic size, package broadcasts without extras, detaching/reattaching the engine
+* `getApp`, icons and details now run off the main thread (previously only the listing did)
+* Example rewritten: lazy icons, search, sort, details screen, benchmark screen
+
 ## [2.2.0] - 1st April 2022
 
 * Uninstall an application
