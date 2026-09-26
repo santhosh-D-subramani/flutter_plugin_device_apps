@@ -1,12 +1,13 @@
 import 'dart:async';
 
 import 'package:device_apps/device_apps.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class AppsEventsScreen extends StatefulWidget {
+  const AppsEventsScreen({super.key});
+
   @override
-  _AppsEventsScreenState createState() => _AppsEventsScreenState();
+  State<AppsEventsScreen> createState() => _AppsEventsScreenState();
 }
 
 class _AppsEventsScreenState extends State<AppsEventsScreen> {
@@ -29,7 +30,7 @@ class _AppsEventsScreenState extends State<AppsEventsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Applications events'),
+        title: const Text('Applications events'),
       ),
       body: Stack(
         alignment: Alignment.center,
@@ -78,7 +79,7 @@ class _EventsList extends StatelessWidget {
 class _AppEventItem extends StatelessWidget {
   final ApplicationEvent event;
 
-  _AppEventItem({required this.event});
+  const _AppEventItem({required this.event});
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +88,7 @@ class _AppEventItem extends StatelessWidget {
         ListTile(
           title: Text(event.packageName),
           subtitle: _AppEventItemType(event.event),
-          leading: Text('${event.time.hour}:${event.time.minute}'),
+          leading: Text('${event.time.hour}:${event.time.minute.toString().padLeft(2, '0')}'),
         ),
         const Divider()
       ],
@@ -127,6 +128,9 @@ class _EmptyList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(child: Text('No event yet!'));
+    return const Center(
+      child: Text('No event yet!\nInstall, update or uninstall an app.',
+          textAlign: TextAlign.center),
+    );
   }
 }

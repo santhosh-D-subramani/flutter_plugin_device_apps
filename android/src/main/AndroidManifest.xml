@@ -1,4 +1,13 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="fr.g123k.deviceapps">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Since Android 11, apps only see packages they declare. Declaring launcher activities
+         keeps launchable apps visible without the restricted QUERY_ALL_PACKAGES permission
+         (see README if you need every package, including background services). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
 </manifest>

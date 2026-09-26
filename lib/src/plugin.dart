@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'model/application_category.dart';
@@ -22,32 +21,37 @@ class DeviceApps {
   /// [includeAppIcons] will also include the icon for each app (be aware that
   /// this feature is memory-heaving, since it will load all icons).
   /// To get the icon you have to cast the object to [ApplicationWithIcon]
+  /// [iconSize] is the size in pixels of the icons (their intrinsic size, often
+  /// 300px+, if omitted). Pass the size you display them at: it is much faster.
+  /// For long lists, prefer to fetch without icons and use [getAppIcon] lazily.
   /// [onlyAppsWithLaunchIntent] will only list applications when an entrypoint.
   /// It is similar to what a launcher will display
   static Future<List<Application>> getInstalledApplications({
-    bool includeSystemApps: false,
-    bool includeAppIcons: false,
-    bool onlyAppsWithLaunchIntent: false,
+    bool includeSystemApps = false,
+    bool includeAppIcons = false,
+    bool onlyAppsWithLaunchIntent = false,
+    int? iconSize,
   }) async {
     try {
-      final Object apps =
-          await _methodChannel.invokeMethod('getInstalledApps', <String, bool>{
+      final Object? apps = await _methodChannel
+          .invokeMethod<Object>('getInstalledApps', <String, Object?>{
         'system_apps': includeSystemApps,
         'include_app_icons': includeAppIcons,
-        'only_apps_with_launch_intent': onlyAppsWithLaunchIntent
+        'only_apps_with_launch_intent': onlyAppsWithLaunchIntent,
+        'icon_size': iconSize,
       });
 
       if (apps is Iterable) {
-        List<Application> list = <Application>[];
-        for (Object app in apps) {
+        final List<Application> list = <Application>[];
+        for (final Object? app in apps) {
           if (app is Map) {
             try {
               list.add(Application._(app));
             } catch (e, trace) {
               if (e is AssertionError) {
-                print('[DeviceApps] Unable to add the following app: $app');
+                debugPrint('[DeviceApps] Unable to add the following app: $app');
               } else {
-                print('[DeviceApps] $e $trace');
+                debugPrint('[DeviceApps] $e $trace');
               }
             }
           }
@@ -57,7 +61,7 @@ class DeviceApps {
         return List<Application>.empty();
       }
     } catch (err) {
-      print(err);
+      debugPrint('[DeviceApps] $err');
       return List<Application>.empty();
     }
   }
@@ -65,18 +69,21 @@ class DeviceApps {
   /// Provide all information for a given app by its [packageName]
   /// [includeAppIcon] will also include the icon for the app.
   /// To get it, you have to cast the object to [ApplicationWithIcon].
+  /// [iconSize] is the size of the icon in pixels (intrinsic size if omitted)
   static Future<Application?> getApp(
     String packageName, [
     bool includeAppIcon = false,
+    int? iconSize,
   ]) async {
     if (packageName.isEmpty) {
       throw Exception('The package name can not be empty');
     }
     try {
-      final Object? app = await _methodChannel.invokeMethod(
-          'getApp', <String, Object>{
+      final Object? app = await _methodChannel
+          .invokeMethod<Object>('getApp', <String, Object?>{
         'package_name': packageName,
-        'include_app_icon': includeAppIcon
+        'include_app_icon': includeAppIcon,
+        'icon_size': iconSize,
       });
 
       if (app != null && app is Map<dynamic, dynamic>) {
@@ -85,7 +92,47 @@ class DeviceApps {
         return null;
       }
     } catch (err) {
-      print(err);
+      debugPrint('[DeviceApps] $err');
+      return null;
+    }
+  }
+
+  /// Returns the icon (PNG) of a given [packageName], or null if the app is not
+  /// installed. Use with [Image.memory].
+  /// [iconSize] is the size of the icon in pixels (intrinsic size if omitted)
+  ///
+  /// Combined with [getInstalledApplications] without icons, this allows to
+  /// display a list immediately and to only load the icons which are visible.
+  static Future<Uint8List?> getAppIcon(String packageName, {int? iconSize}) {
+    if (packageName.isEmpty) {
+      throw Exception('The package name can not be empty');
+    }
+
+    return _methodChannel
+        .invokeMethod<Uint8List>('getAppIcon', <String, Object?>{
+          'package_name': packageName,
+          'icon_size': iconSize,
+        })
+        .catchError((Object err) => null);
+  }
+
+  /// Provide advanced information for a given app by its [packageName]:
+  /// installer (Play Store, sideloaded…), permissions, signing certificates,
+  /// components… Returns null if the app is not installed.
+  static Future<ApplicationDetails?> getAppDetails(String packageName) async {
+    if (packageName.isEmpty) {
+      throw Exception('The package name can not be empty');
+    }
+    try {
+      final Object? details = await _methodChannel.invokeMethod<Object>(
+          'getAppDetails', <String, Object>{'package_name': packageName});
+
+      if (details is Map<dynamic, dynamic>) {
+        return ApplicationDetails._fromMap(details);
+      }
+      return null;
+    } catch (err) {
+      debugPrint('[DeviceApps] $err');
       return null;
     }
   }
@@ -93,19 +140,7 @@ class DeviceApps {
   /// Returns whether a given [packageName] is installed on the device
   /// You will then receive in return a boolean
   static Future<bool> isAppInstalled(String packageName) {
-    if (packageName.isEmpty) {
-      throw Exception('The package name can not be empty');
-    }
-
-    return _methodChannel
-        .invokeMethod<bool>(
-          'isAppInstalled',
-          <String, String>{
-            'package_name': packageName,
-          },
-        )
-        .then((bool? value) => value ?? false)
-        .catchError((dynamic err) => false);
+    return _invokePackageAction('isAppInstalled', packageName);
   }
 
   /// Launch an app based on its [packageName]
@@ -113,50 +148,40 @@ class DeviceApps {
   /// (will be false if the app is not installed, or if no "launcher" intent is
   /// provided by this app)
   static Future<bool> openApp(String packageName) {
-    if (packageName.isEmpty) {
-      throw Exception('The package name can not be empty');
-    }
-
-    return _methodChannel
-        .invokeMethod<bool>(
-          'openApp',
-          <String, String>{
-            'package_name': packageName,
-          },
-        )
-        .then((bool? value) => value ?? false)
-        .catchError((dynamic err) => false);
+    return _invokePackageAction('openApp', packageName);
   }
 
   /// Launch the Settings screen of the app based on its [packageName]
   /// You will then receive in return if the app was opened
   /// (will be false if the app is not installed)
   static Future<bool> openAppSettings(String packageName) {
-    if (packageName.isEmpty) {
-      throw Exception('The package name can not be empty');
-    }
-
-    return _methodChannel
-        .invokeMethod<bool>('openAppSettings', <String, String>{
-          'package_name': packageName,
-        })
-        .then((bool? value) => value ?? false)
-        .catchError((dynamic err) => false);
+    return _invokePackageAction('openAppSettings', packageName);
   }
 
   /// Uninstall an application by giving its [packageName]
   /// Note: It will only open the Android's screen
+  /// Requires the `REQUEST_DELETE_PACKAGES` permission in your manifest
   static Future<bool> uninstallApp(String packageName) {
+    return _invokePackageAction('uninstallApp', packageName);
+  }
+
+  /// Open the page of the app in the store (Play Store…), or on the Play Store
+  /// website if no store is available. The app doesn't need to be installed.
+  static Future<bool> openAppInStore(String packageName) {
+    return _invokePackageAction('openAppInStore', packageName);
+  }
+
+  static Future<bool> _invokePackageAction(String method, String packageName) {
     if (packageName.isEmpty) {
       throw Exception('The package name can not be empty');
     }
 
     return _methodChannel
-        .invokeMethod<bool>('uninstallApp', <String, String>{
+        .invokeMethod<bool>(method, <String, String>{
           'package_name': packageName,
         })
         .then((bool? value) => value ?? false)
-        .catchError((dynamic err) => false);
+        .catchError((Object err) => false);
   }
 
   /// Listen to app changes: installations, uninstallations, updates, enabled or
@@ -219,8 +244,20 @@ class Application extends _BaseApplication {
   /// or disabled (installed, but not visible)
   final bool enabled;
 
+  /// The Android API level the app targets
+  final int targetSdkVersion;
+
+  /// The minimum Android API level required by the app (null on Android < 24)
+  final int? minSdkVersion;
+
+  /// Size in bytes of the APK(s): the base APK plus all split APKs
+  final int apkSize;
+
+  /// Whether the app has an entrypoint (= visible in a launcher)
+  final bool launchable;
+
   factory Application._(Map<dynamic, dynamic> map) {
-    if (map.length == 0) {
+    if (map.isEmpty) {
       throw Exception('The map can not be null!');
     }
     if (map.containsKey('app_icon')) {
@@ -235,40 +272,53 @@ class Application extends _BaseApplication {
         apkFilePath = map['apk_file_path'] as String,
         versionName = map['version_name'] as String?,
         versionCode = map['version_code'] as int,
-        dataDir = map['data_dir'] as String,
+        dataDir = map['data_dir'] as String?,
         systemApp = map['system_app'] as bool,
         installTimeMillis = map['install_time'] as int,
         updateTimeMillis = map['update_time'] as int,
         enabled = map['is_enabled'] as bool,
         category = _parseCategory(map['category']),
+        targetSdkVersion = map['target_sdk'] as int? ?? 0,
+        minSdkVersion = map['min_sdk'] as int?,
+        apkSize = map['apk_size'] as int? ?? 0,
+        launchable = map['launchable'] as bool? ?? false,
         super.fromMap(map);
 
   /// Mapping of Android categories
   /// [https://developer.android.com/reference/kotlin/android/content/pm/ApplicationInfo]
   /// [category] is null on Android < 26
   static ApplicationCategory _parseCategory(Object? category) {
-    if (category is num && category < 0) {
-      return ApplicationCategory.undefined;
-    } else if (category == 0) {
-      return ApplicationCategory.game;
-    } else if (category == 1) {
-      return ApplicationCategory.audio;
-    } else if (category == 2) {
-      return ApplicationCategory.video;
-    } else if (category == 3) {
-      return ApplicationCategory.image;
-    } else if (category == 4) {
-      return ApplicationCategory.social;
-    } else if (category == 5) {
-      return ApplicationCategory.news;
-    } else if (category == 6) {
-      return ApplicationCategory.maps;
-    } else if (category == 7) {
-      return ApplicationCategory.productivity;
-    } else {
-      return ApplicationCategory.undefined;
+    switch (category) {
+      case 0:
+        return ApplicationCategory.game;
+      case 1:
+        return ApplicationCategory.audio;
+      case 2:
+        return ApplicationCategory.video;
+      case 3:
+        return ApplicationCategory.image;
+      case 4:
+        return ApplicationCategory.social;
+      case 5:
+        return ApplicationCategory.news;
+      case 6:
+        return ApplicationCategory.maps;
+      case 7:
+        return ApplicationCategory.productivity;
+      case 8:
+        return ApplicationCategory.accessibility;
+      default:
+        return ApplicationCategory.undefined;
     }
   }
+
+  /// Time at which the app was first installed
+  DateTime get installTime =>
+      DateTime.fromMillisecondsSinceEpoch(installTimeMillis);
+
+  /// Time at which the app was last updated
+  DateTime get updateTime =>
+      DateTime.fromMillisecondsSinceEpoch(updateTimeMillis);
 
   // Open the app default screen
   // Will return [true] is the app is installed and the screen visible
@@ -291,6 +341,21 @@ class Application extends _BaseApplication {
     return DeviceApps.uninstallApp(packageName);
   }
 
+  // Open the app page in the store
+  Future<bool> openInStore() {
+    return DeviceApps.openAppInStore(packageName);
+  }
+
+  // Load the icon of this app (see [DeviceApps.getAppIcon])
+  Future<Uint8List?> loadIcon({int? iconSize}) {
+    return DeviceApps.getAppIcon(packageName, iconSize: iconSize);
+  }
+
+  // Load advanced information (see [DeviceApps.getAppDetails])
+  Future<ApplicationDetails?> loadDetails() {
+    return DeviceApps.getAppDetails(packageName);
+  }
+
   @override
   String toString() {
     return 'Application{'
@@ -304,7 +369,11 @@ class Application extends _BaseApplication {
         'installTimeMillis: $installTimeMillis, '
         'updateTimeMillis: $updateTimeMillis, '
         'category: $category, '
-        'enabled: $enabled'
+        'enabled: $enabled, '
+        'targetSdkVersion: $targetSdkVersion, '
+        'minSdkVersion: $minSdkVersion, '
+        'apkSize: $apkSize, '
+        'launchable: $launchable'
         '}';
   }
 
@@ -323,21 +392,30 @@ class Application extends _BaseApplication {
           installTimeMillis == other.installTimeMillis &&
           updateTimeMillis == other.updateTimeMillis &&
           category == other.category &&
-          enabled == other.enabled;
+          enabled == other.enabled &&
+          targetSdkVersion == other.targetSdkVersion &&
+          minSdkVersion == other.minSdkVersion &&
+          apkSize == other.apkSize &&
+          launchable == other.launchable;
 
   @override
-  int get hashCode =>
-      appName.hashCode ^
-      apkFilePath.hashCode ^
-      packageName.hashCode ^
-      versionName.hashCode ^
-      versionCode.hashCode ^
-      dataDir.hashCode ^
-      systemApp.hashCode ^
-      installTimeMillis.hashCode ^
-      updateTimeMillis.hashCode ^
-      category.hashCode ^
-      enabled.hashCode;
+  int get hashCode => Object.hash(
+        appName,
+        apkFilePath,
+        packageName,
+        versionName,
+        versionCode,
+        dataDir,
+        systemApp,
+        installTimeMillis,
+        updateTimeMillis,
+        category,
+        enabled,
+        targetSdkVersion,
+        minSdkVersion,
+        apkSize,
+        launchable,
+      );
 }
 
 /// If the [includeAppIcons] attribute is provided, this class will be used.
@@ -348,25 +426,166 @@ class Application extends _BaseApplication {
 /// Image.memory(app.icon)
 /// ```
 class ApplicationWithIcon extends Application {
-  final String _icon;
+  /// Icon of the application (PNG) to use in conjunction with [Image.memory]
+  final Uint8List icon;
 
   ApplicationWithIcon._fromMap(Map<dynamic, dynamic> map)
-      : _icon = map['app_icon'] as String,
+      : icon = _parseIcon(map['app_icon']),
         super.fromMap(map);
 
-  /// Icon of the application to use in conjunction with [Image.memory]
-  Uint8List get icon => base64.decode(_icon);
+  /// Icons are sent as raw bytes (older versions of the plugin used Base64)
+  static Uint8List _parseIcon(Object? icon) {
+    if (icon is Uint8List) {
+      return icon;
+    } else if (icon is String) {
+      return base64.decode(icon);
+    }
+    throw Exception('Invalid icon $icon');
+  }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       super == other &&
           other is ApplicationWithIcon &&
-          runtimeType == other.runtimeType &&
-          _icon == other._icon;
+          listEquals(icon, other.icon);
 
   @override
-  int get hashCode => super.hashCode ^ _icon.hashCode;
+  int get hashCode => Object.hash(super.hashCode, icon.length);
+}
+
+/// A permission requested by an application
+class ApplicationPermission {
+  /// eg: android.permission.CAMERA
+  final String name;
+
+  /// Whether the permission is currently granted
+  final bool granted;
+
+  const ApplicationPermission({required this.name, required this.granted});
+
+  @override
+  String toString() => 'ApplicationPermission{name: $name, granted: $granted}';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApplicationPermission &&
+          name == other.name &&
+          granted == other.granted;
+
+  @override
+  int get hashCode => Object.hash(name, granted);
+}
+
+/// Advanced information about an application, see [DeviceApps.getAppDetails]
+class ApplicationDetails {
+  final Application application;
+
+  /// Package name of the app which installed this one (eg: com.android.vending
+  /// for the Play Store). Null for pre-installed or adb-installed apps.
+  final String? installerPackageName;
+
+  /// Package name of the app which requested the installation (Android 30+).
+  /// It may differ from [installerPackageName], eg: a browser which downloaded
+  /// an APK installed by the system package installer.
+  final String? initiatingPackageName;
+
+  /// Permissions declared in the manifest, and whether they are granted
+  final List<ApplicationPermission> permissions;
+
+  /// Number of components declared in the manifest (null if unavailable)
+  final int? activitiesCount;
+  final int? servicesCount;
+  final int? receiversCount;
+  final int? providersCount;
+
+  /// Names of the split APKs (App Bundles), empty for a monolithic APK
+  final List<String> splitNames;
+
+  /// Linux user id of the app
+  final int uid;
+
+  /// Whether the app is a debug build
+  final bool debuggable;
+
+  /// Whether the app is suspended (eg: by Digital Wellbeing) (Android 24+)
+  final bool? suspended;
+
+  /// Whether the app allows cleartext (HTTP) network traffic (Android 23+)
+  final bool? usesCleartextTraffic;
+
+  final String? processName;
+  final String? nativeLibraryDir;
+
+  /// SHA-256 fingerprints (AA:BB:… format, same as `keytool`) of the signing
+  /// certificates. Useful to check that an app is the genuine one.
+  final List<String> signingCertificatesSha256;
+
+  ApplicationDetails._fromMap(Map<dynamic, dynamic> map)
+      : application = Application._(map),
+        installerPackageName = map['installer_package_name'] as String?,
+        initiatingPackageName = map['initiating_package_name'] as String?,
+        permissions = (map['permissions'] as List<dynamic>? ?? <dynamic>[])
+            .cast<Map<dynamic, dynamic>>()
+            .map((Map<dynamic, dynamic> permission) => ApplicationPermission(
+                  name: permission['name'] as String,
+                  granted: permission['granted'] as bool,
+                ))
+            .toList(growable: false),
+        activitiesCount = map['activities_count'] as int?,
+        servicesCount = map['services_count'] as int?,
+        receiversCount = map['receivers_count'] as int?,
+        providersCount = map['providers_count'] as int?,
+        splitNames = (map['split_names'] as List<dynamic>? ?? <dynamic>[])
+            .cast<String>(),
+        uid = map['uid'] as int,
+        debuggable = map['debuggable'] as bool,
+        suspended = map['suspended'] as bool?,
+        usesCleartextTraffic = map['uses_cleartext_traffic'] as bool?,
+        processName = map['process_name'] as String?,
+        nativeLibraryDir = map['native_library_dir'] as String?,
+        signingCertificatesSha256 =
+            (map['signing_certificates_sha256'] as List<dynamic>? ??
+                    <dynamic>[])
+                .cast<String>();
+
+  String get packageName => application.packageName;
+
+  /// Whether the app was installed from the Google Play Store
+  bool get installedFromPlayStore =>
+      installerPackageName == 'com.android.vending';
+
+  /// Whether the app was installed by something else than a known store
+  /// (eg: an APK file or adb). Pre-installed apps are not considered sideloaded.
+  bool get sideloaded =>
+      !application.systemApp &&
+      !_knownStores.contains(installerPackageName);
+
+  static const Set<String?> _knownStores = <String?>{
+    'com.android.vending',
+    'com.amazon.venezia',
+    'com.sec.android.app.samsungapps',
+    'com.huawei.appmarket',
+    'com.xiaomi.market',
+    'com.xiaomi.mipicks',
+    'com.oppo.market',
+    'com.heytap.market',
+    'com.bbk.appstore',
+    'org.fdroid.fdroid',
+    'com.aurora.store',
+  };
+
+  @override
+  String toString() {
+    return 'ApplicationDetails{'
+        'packageName: $packageName, '
+        'installerPackageName: $installerPackageName, '
+        'permissions: ${permissions.length}, '
+        'splitNames: $splitNames, '
+        'signingCertificatesSha256: $signingCertificatesSha256'
+        '}';
+  }
 }
 
 /// Represent an event relative to an application, which can be:
@@ -385,7 +604,7 @@ abstract class ApplicationEvent {
     Object? eventType = map['event_type'];
 
     if (eventType is! String) {
-      throw Exception('Event type \"$eventType\" can not be empty!');
+      throw Exception('Event type "$eventType" can not be empty!');
     }
 
     switch (eventType) {
@@ -476,7 +695,7 @@ class ApplicationEventUpdated extends ApplicationEvent {
   bool operator ==(Object other) =>
       identical(this, other) ||
       super == other &&
-          other is ApplicationEventInstalled &&
+          other is ApplicationEventUpdated &&
           runtimeType == other.runtimeType &&
           application == other.application;
 
@@ -506,12 +725,12 @@ class ApplicationEventUninstalled extends ApplicationEvent {
   bool operator ==(Object other) =>
       identical(this, other) ||
       super == other &&
-          other is ApplicationEventInstalled &&
+          other is ApplicationEventUninstalled &&
           runtimeType == other.runtimeType &&
-          _application == other.application;
+          packageName == other.packageName;
 
   @override
-  int get hashCode => super.hashCode ^ _application.hashCode;
+  int get hashCode => Object.hash(super.hashCode, packageName);
 
   @override
   String toString() {
@@ -536,7 +755,7 @@ class ApplicationEventEnabled extends ApplicationEvent {
   bool operator ==(Object other) =>
       identical(this, other) ||
       super == other &&
-          other is ApplicationEventInstalled &&
+          other is ApplicationEventEnabled &&
           runtimeType == other.runtimeType &&
           application == other.application;
 
@@ -566,7 +785,7 @@ class ApplicationEventDisabled extends ApplicationEvent {
   bool operator ==(Object other) =>
       identical(this, other) ||
       super == other &&
-          other is ApplicationEventInstalled &&
+          other is ApplicationEventDisabled &&
           runtimeType == other.runtimeType &&
           application == other.application;
 

@@ -1,9 +1,12 @@
 package fr.g123k.deviceapps.listener;
 
+import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.Uri;
+import android.os.Build;
 
 import androidx.annotation.NonNull;
 
@@ -18,13 +21,23 @@ public class DeviceAppsChangedListener {
     private final Set<EventChannel.EventSink> sinks;
 
     private BroadcastReceiver appsBroadcastReceiver;
+    private boolean registered;
 
     public DeviceAppsChangedListener(DeviceAppsChangedListenerInterface callback) {
         this.callback = callback;
         this.sinks = new HashSet<>(1);
     }
 
+    // Package broadcasts are protected system broadcasts: they are still delivered to a
+    // non-exported receiver, and no other app is allowed to send them.
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     public void register(@NonNull Context context, EventChannel.EventSink events) {
+        sinks.add(events);
+
+        if (registered) {
+            return;
+        }
+
         if (appsBroadcastReceiver == null) {
             createBroadcastReceiver();
         }
@@ -36,20 +49,28 @@ public class DeviceAppsChangedListener {
         intentFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
         intentFilter.addDataScheme("package");
 
-        sinks.add(events);
-
-        context.registerReceiver(appsBroadcastReceiver, intentFilter);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(appsBroadcastReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            context.registerReceiver(appsBroadcastReceiver, intentFilter);
+        }
+        registered = true;
     }
 
     private void createBroadcastReceiver() {
         appsBroadcastReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                String packageName = intent.getDataString().replace("package:", "");
+                Uri data = intent.getData();
+                String action = intent.getAction();
+                if (data == null || action == null) {
+                    return;
+                }
 
-                boolean replacing = intent.getExtras().getBoolean(Intent.EXTRA_REPLACING, false);
+                String packageName = data.getSchemeSpecificPart();
+                boolean replacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false);
 
-                switch (intent.getAction()) {
+                switch (action) {
                     case Intent.ACTION_PACKAGE_ADDED:
                         if (!replacing) {
                             onPackageInstalled(packageName);
@@ -59,8 +80,9 @@ public class DeviceAppsChangedListener {
                         onPackageUpdated(packageName);
                         break;
                     case Intent.ACTION_PACKAGE_CHANGED:
-                        String[] components = intent.getExtras().getStringArray(Intent.EXTRA_CHANGED_COMPONENT_NAME_LIST);
-                        if (components.length == 1 && components[0].equalsIgnoreCase(packageName)) {
+                        // Only the whole package being enabled/disabled, not a single component
+                        String[] components = intent.getStringArrayExtra(Intent.EXTRA_CHANGED_COMPONENT_NAME_LIST);
+                        if (components != null && components.length == 1 && components[0].equalsIgnoreCase(packageName)) {
                             onPackageChanged(packageName);
                         }
                         break;
@@ -99,8 +121,13 @@ public class DeviceAppsChangedListener {
     }
 
     public void unregister(@NonNull Context context) {
-        if (appsBroadcastReceiver != null) {
-            context.unregisterReceiver(appsBroadcastReceiver);
+        if (appsBroadcastReceiver != null && registered) {
+            try {
+                context.unregisterReceiver(appsBroadcastReceiver);
+            } catch (IllegalArgumentException ignored) {
+                // Already unregistered
+            }
+            registered = false;
         }
 
         sinks.clear();

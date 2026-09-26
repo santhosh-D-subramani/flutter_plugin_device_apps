@@ -31,6 +31,10 @@ enum ApplicationCategory {
   /// streaming video apps.
   video,
 
+  /// Category for apps which are primarily accessibility apps, such as
+  /// screen-readers (Android 31+).
+  accessibility,
+
   /// Value when category is undefined.
   undefined,
 }
