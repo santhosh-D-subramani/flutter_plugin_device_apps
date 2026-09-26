@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.0.1] - 26th September 2026
+
+* Example: chip filters on the applications list — System and User (combinable, both = every app), Launchable,
+  Disabled, and per-category chips with counts. Only enabling "System" refetches, other chips filter instantly
+
 ## [3.0.0] - 26th September 2026
 
 * [BREAKING CHANGE] Requires Dart 3 / Flutter 3.10+ (the previous `<3.0.0` SDK constraint no longer resolved)
