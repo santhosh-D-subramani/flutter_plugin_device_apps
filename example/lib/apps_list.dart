@@ -1,7 +1,7 @@
-import 'package:device_apps/device_apps.dart';
 import 'package:device_apps_example/app_details.dart';
 import 'package:device_apps_example/app_icon.dart';
 import 'package:device_apps_example/format.dart';
+import 'package:device_apps_ng/device_apps_ng.dart';
 import 'package:flutter/material.dart';
 
 enum _SortOrder { name, recentlyUpdated, recentlyInstalled, size }

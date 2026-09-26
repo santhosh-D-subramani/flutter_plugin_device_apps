@@ -1,5 +1,5 @@
-import 'package:device_apps/device_apps.dart';
 import 'package:device_apps_example/format.dart';
+import 'package:device_apps_ng/device_apps_ng.dart';
 import 'package:flutter/material.dart';
 
 /// Measures how the fetch options impact [DeviceApps.getInstalledApplications]

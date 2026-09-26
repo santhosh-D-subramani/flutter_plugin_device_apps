@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:device_apps/device_apps.dart';
+import 'package:device_apps_ng/device_apps_ng.dart';
 import 'package:flutter/material.dart';
 
 /// Loads the icon of an app only when the widget is built (= visible in a

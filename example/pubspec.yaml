@@ -1,21 +1,21 @@
 name: device_apps_example
-description: Demonstrates how to use the device_apps plugin.
+description: Demonstrates how to use the device_apps_ng plugin.
 publish_to: 'none'
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
 
 dependencies:
   flutter:
     sdk: flutter
 
+  device_apps_ng:
+    path: ../
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  device_apps:
-    path: ../
-
 flutter:
   uses-material-design: true
-
-environment:
-  sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.10.0"

@@ -1,10 +1,46 @@
-# Device Apps plugin for Flutter (UNMAINTAINED)
+# device_apps_ng
 
-[![Pub](https://img.shields.io/pub/v/device_apps.svg)](https://pub.dartlang.org/packages/device_apps)
+[![Pub](https://img.shields.io/pub/v/device_apps_ng.svg)](https://pub.dev/packages/device_apps_ng)
 
-A plugin to list installed applications on an Android device (⚠️ iOS is not supported). You can also listen to app changes (eg: installations, updates…)
+A plugin to list installed applications on an Android device (⚠️ iOS is not supported), get their details, and listen to
+app changes (eg: installations, updates…)
 
-## BREAKING CHANGE - 05th May 2021
+## About this fork
+
+`device_apps_ng` is a fork of [device_apps](https://pub.dev/packages/device_apps) by
+[g123k](https://github.com/g123k/flutter_plugin_device_apps), which is no longer maintained.
+
+**This fork is actively maintained.** Its first releases bring the plugin up to date:
+
+- Builds on current Flutter / Dart 3 / Android Gradle Plugin, with no deprecated Android API left
+- Much faster listing (parallel reads, lazily loaded and resized icons)
+- New APIs: `getAppIcon`, `getAppDetails` (installer, permissions, signing certificates…), `openAppInStore`
+- Many bug fixes
+
+See the [CHANGELOG](CHANGELOG.md) for the full list. Issues and pull requests are welcome on
+[GitHub](https://github.com/santhosh-D-subramani/flutter_plugin_device_apps/issues).
+
+The original code is © its authors and licensed under the Apache License 2.0, as are the changes made in this fork.
+
+### Migrating from device_apps
+
+The API is compatible. Replace the dependency:
+
+```yaml
+dependencies:
+  device_apps_ng: ^3.0.2
+```
+
+and the import:
+
+```dart
+import 'package:device_apps_ng/device_apps_ng.dart';
+```
+
+Note that it requires Dart 3, that icons are now `Uint8List` bytes directly, and that `ApplicationCategory` has a new
+`accessibility` value (update exhaustive `switch` statements).
+
+## Google Play and `QUERY_ALL_PACKAGES`
 
 [May 5 2021](https://support.google.com/googleplay/android-developer/answer/10158779) will mark a breaking change on how applications requesting [`QUERY_ALL_PACKAGES`](https://developer.android.com/reference/kotlin/android/Manifest.permission#query_all_packages) are accepted in the Google Play (and only this app store !). [Quoting from the doc](https://support.google.com/googleplay/android-developer/answer/10158779):
 
@@ -16,14 +52,13 @@ A plugin to list installed applications on an Android device (⚠️ iOS is not 
 
 More info here: https://support.google.com/googleplay/android-developer/answer/10158779
 
-**Starting with version 2.1.0 of this plugin, the [`QUERY_ALL_PACKAGES`](https://developer.android.com/reference/kotlin/android/Manifest.permission#query_all_packages) permission won't be requested by default!**
+**This plugin doesn't request the [`QUERY_ALL_PACKAGES`](https://developer.android.com/reference/kotlin/android/Manifest.permission#query_all_packages) permission by default.**
 
 ## Change with Android 11
 
 Starting with Android 11, Android applications targeting API level 30, willing to list "external" applications have to declare a new "normal" permission in their `AndroidManifest.xml` file called [`QUERY_ALL_PACKAGES`](https://developer.android.com/reference/kotlin/android/Manifest.permission#query_all_packages). A few notes about this:
 
 - A normal permission doesn't require the user consent
-- Before version 2.1 of this plugin, the permission was requested automatically. This is not the case anymore
 
 **Since version 3.0.0, the plugin declares a `<queries>` entry for launcher activities**: every app visible in a launcher
 (= `onlyAppsWithLaunchIntent: true`) is listed without any permission. `QUERY_ALL_PACKAGES` is only needed to also see
@@ -41,18 +76,18 @@ If you need it, simply add the following to your AndroidManifest.xml:
 
 
 
-However, publishing applications on the Google Play with this kind of feature **may change** in the future. [Quoting from the documentation](https://developer.android.com/reference/kotlin/android/Manifest.permission#query_all_packages):
-
-> In an upcoming policy update, look for Google Play to provide guidelines for apps that need the QUERY_ALL_PACKAGES permission.
-
-**👍 Right now, there is no limitation, but be aware that this may change in the future.**
-
 ## Getting Started
 
-First, you have to import the package in your dart file with:
+Add the dependency:
+
+```bash
+flutter pub add device_apps_ng
+```
+
+Then import the package in your dart file with:
 
 ```dart
-import 'package:device_apps/device_apps.dart';
+import 'package:device_apps_ng/device_apps_ng.dart';
 ```
 
 ## List of installed applications

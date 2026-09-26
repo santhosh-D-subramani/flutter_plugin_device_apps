@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.0.2] - 26th September 2026
+
+* First release as `device_apps_ng`, an actively maintained fork of [device_apps](https://pub.dev/packages/device_apps)
+  (see README to migrate: only the dependency and import change)
+* Versions 3.0.0 and 3.0.1 below were made in this fork; earlier versions are from the original package
+
 ## [3.0.1] - 26th September 2026
 
 * Example: chip filters on the applications list — System and User (combinable, both = every app), Launchable,

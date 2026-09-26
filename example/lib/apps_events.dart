@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:device_apps/device_apps.dart';
+import 'package:device_apps_ng/device_apps_ng.dart';
 import 'package:flutter/material.dart';
 
 class AppsEventsScreen extends StatefulWidget {
